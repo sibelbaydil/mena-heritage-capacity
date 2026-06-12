@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Cultural Heritage Conservation Capacity Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  html,body{margin:0;height:100%;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:#0e1117;color:#e6e6e6;}
+  #map{position:absolute;top:0;left:0;right:460px;bottom:0;}
+  #panel{position:absolute;top:0;right:0;width:460px;bottom:0;background:#10141b;border-left:1px solid #2a2f3a;
+         padding:18px;box-sizing:border-box;overflow-y:auto;}
+  #panel h2{margin-top:0;font-size:1.35em;border-bottom:1px solid #2a2f3a;padding-bottom:10px;}
+  .stat{display:flex;justify-content:space-between;font-size:0.85em;margin:4px 0;color:#aab;}
+  .stat b{color:#fff;}
+  .leaflet-control-zoom{display:none !important;}
+  .legend{position:absolute;bottom:24px;left:10px;background:#161b22cc;padding:10px 14px;border-radius:8px;
+          font-size:0.78em;border:1px solid #2a2f3a;width:170px;box-sizing:border-box;}
+  .legend b{display:block;margin-bottom:6px;font-size:0.95em;}
+  .legend .row{display:flex;align-items:center;gap:6px;margin:3px 0;}
+  .legend i{display:inline-block;width:14px;height:14px;border-radius:2px;flex-shrink:0;}
+  .placeholder{color:#888;font-size:0.85em;text-align:center;margin-top:80px;}
+  .summary{font-size:0.85em;color:#cdd;margin:10px 0 16px;line-height:1.45em;}
+  .topstats{display:flex;flex-direction:column;gap:0;margin-top:10px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;}
+  .card{background:#1b212c;border:1px solid #2a2f3a;border-radius:8px;padding:10px 10px 6px;
+        display:flex;flex-direction:column;}
+  .card.full{grid-column:1 / -1;}
+  .card h3{margin:0 0 4px;font-size:0.78em;font-weight:600;color:#9fc5ff;letter-spacing:.2px;
+           text-transform:uppercase;}
+  .card .chartwrap{flex:1;display:flex;align-items:center;justify-content:center;min-width:0;}
+  .card canvas{max-width:100% !important;height:auto !important;}
+
+  #titlebar{position:absolute;top:14px;left:14px;right:476px;z-index:500;min-height:150px;
+            background:#161b22e6;border:1px solid #2a2f3a;border-radius:10px;
+            padding:12px 18px;box-shadow:0 4px 16px rgba(0,0,0,.35);
+            display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;
+            box-sizing:border-box;}
+  #titlebar h1{margin:0;font-size:1.05em;font-weight:700;color:#fff;}
+  #titlebar p{margin:2px 0 0;font-size:0.78em;color:#9aa;}
+  #metricControl{display:flex;align-items:center;gap:8px;font-size:0.8em;color:#cdd;flex-shrink:0;margin-left:auto;}
+  #metricSelectBtn{background:#0e1117;color:#e6e6e6;border:1px solid #3a3f4b;border-radius:6px;
+                 padding:5px 8px;font-size:0.82em;width:240px;flex-shrink:0;text-align:left;
+                 cursor:pointer;position:relative;}
+  #metricSelectBtn:after{content:'\25BE';position:absolute;right:8px;color:#888;}
+  #metricDropdown{position:absolute;top:34px;right:0;width:280px;max-height:340px;overflow-y:auto;
+                 background:#0e1117;border:1px solid #3a3f4b;border-radius:6px;z-index:600;
+                 box-shadow:0 6px 20px rgba(0,0,0,.5);display:none;}
+  #metricDropdown.open{display:block;}
+  #metricDropdown .grp{padding:6px 10px 2px;font-size:0.72em;color:#9fc5ff;text-transform:uppercase;
+                 letter-spacing:.5px;}
+  #metricDropdown .opt{padding:5px 12px;font-size:0.82em;color:#e6e6e6;cursor:pointer;}
+  #metricDropdown .opt:hover{background:#2a2f3a;}
+  #metricDropdown .opt.selected{background:#1a3a52;color:#9fc5ff;}
+  #metricDesc{flex-basis:100%;font-size:0.8em;color:#9aa;line-height:1.5em;
+               border-top:1px solid #2a2f3a;padding-top:8px;margin-top:6px;
+               max-height:130px;overflow-y:auto;}
+  #metricDesc .descBlock{margin-bottom:6px;padding-left:20px;position:relative;}
+  #metricDesc .descBlock:last-child{margin-bottom:0;}
+  #metricDesc .descBlock:before{content:'';position:absolute;left:0;top:0.55em;width:9px;height:9px;
+               border-radius:2px;background:#3a4150;}
+  #metricDesc .descBlock.b1:before{background:#63b3ed;}
+  #metricDesc .descBlock.b2:before{background:#f6ad55;}
+  #metricDesc .descBlock.b3:before{background:#68d391;}
+  #metricDesc b{color:#cdd;}
+  .cardCaption{font-size:0.74em;color:#8a93a3;margin:0 0 6px;line-height:1.35em;font-weight:400;
+                text-transform:none;}
+  .country-label {
+  color: #000;                /* Yazı rengi siyah */
+  font-size: 0.9em;
+  font-weight: 800;           /* Daha kalın yazı */
+  text-align: center;
+  /* Beyaz kenar (edge) efekti için metin gölgesi */
+  text-shadow: 
+     1px  1px 0 #fff,
+    -1px -1px 0 #fff,
+     1px -1px 0 #fff,
+    -1px  1px 0 #fff,
+     1px  0   0 #fff,
+    -1px  0   0 #fff,
+     0    1px 0 #fff,
+     0   -1px 0 #fff;
+  pointer-events: none;       /* Harita etkileşimini engellememesi için */
+  white-space: nowrap;
+}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="titlebar">
+  <div>
+    <h1>Cultural Heritage Conservation Capacity &mdash; Regional Survey</h1>
+    <p>Iraq &middot; Jordan &middot; Libya &middot; Syria &middot; T&uuml;rkiye &mdash; click a country for details</p>
+  </div>
+  <div id="metricControl" style="position:relative;">
+    <label>Color by:</label>
+    <div id="metricSelectBtn"></div>
+    <div id="metricDropdown"></div>
+  </div>
+  <div id="metricDesc"></div>
+</div>
+<div id="panel"><div class="placeholder">Click a country &#9656;</div></div>
+
+<script>
+const countryData = {"Iraq": {"n_orgs": 15, "score": 66.0, "avg_years": 24.0, "ratings": {"Track record": 3.53, "Technical expertise": 3.8, "Equipment & supplies": 2.93, "Public communication": 3.6, "Digital capacity": 3.0, "Fundraising": 2.53, "Grant application": 2.53, "Legal/regulatory": 3.53, "Strategic planning": 3.46, "Professional development": 3.64, "Gender-sensitive programming": 3.29, "Institutional resilience": 3.73}, "needs": {"Training opportunities": 3.47, "Local/regional peer connection": 3.67, "International peer connection": 3.8, "Program planning assistance": 3.13, "Strategy planning assistance": 3.27, "Revenue diversification": 3.33, "Other needs": null}, "trainings": {"Project planning & mgmt": 3.67, "Documentation": 3.53, "Conservation/restoration": 3.73, "Emergency response": 3.47, "Community engagement": 3.93, "Research/policy": 3.87, "Other training": null}, "org_types": {"Government": 10, "NGO": 3, "Academic": 1, "Private": 1}, "registered": {"Yes": 14, "Unspecified": 1}, "scope": {"Built Environment": 14, "Intangible heritage": 6, "Natural heritage": 8, "Documentary Heritage": 9, "Collections": 1}, "funding": {"Public Sector Funding": 10, "Private Sector & Corporate Sponsorship": 2, "Philanthropic & Non-Profit Funding": 7}, "summary": "15 organisations responded, mostly government bodies tied to the State Board of Antiquities and universities. Technical expertise and institutional resilience score relatively well, while fundraising and grant-application capacity are the weakest areas, and connecting with international peers is the top additional need.", "gender_dist": {"Men": 57.3, "Women": 44.0}, "education": {"High school": 149, "BA": 325, "MA": 127, "PhD": 163}, "budget_dist": {"Less than $10,000": 3}, "capacity": {"Planning": 11, "Documentation": 13, "Conservation/restoration": 14, "Emergency response": 12, "Community engagement, advocacy, and awareness": 11, "Research/policy": 9, "Education/training": 13, "Consulting": 12, "Other specialised services": 1}, "affiliations": {"Regional networks": {"Yes": 6, "No": 9}, "Diaspora/grassroots": {"Yes": 10, "No": 5}, "International orgs": {"Yes": 5, "No": 10}}, "timeline": {"0-5 years": 5, "11-15 years": 4, "16-50 years": 4, "51-100 years": 2}}, "Jordan": {"n_orgs": 24, "score": 71.9, "avg_years": 25.6, "ratings": {"Track record": 4.08, "Technical expertise": 4.42, "Equipment & supplies": 3.25, "Public communication": 3.83, "Digital capacity": 3.58, "Fundraising": 2.54, "Grant application": 2.74, "Legal/regulatory": 4.17, "Strategic planning": 3.96, "Professional development": 3.71, "Gender-sensitive programming": 3.43, "Institutional resilience": 3.38}, "needs": {"Training opportunities": 3.54, "Local/regional peer connection": 3.42, "International peer connection": 3.67, "Program planning assistance": 3.7, "Strategy planning assistance": 3.7, "Revenue diversification": 3.92, "Other needs": 4.17}, "trainings": {"Project planning & mgmt": 3.54, "Documentation": 3.04, "Conservation/restoration": 3.04, "Emergency response": 3.5, "Community engagement": 3.42, "Research/policy": 3.12, "Other training": 4.0}, "org_types": {"Government": 7, "NGO": 7, "Private": 6, "Academic": 4}, "registered": {"Yes": 23, "No": 1}, "scope": {"Built Environment": 20, "Designing and building museums and storerooms": 1, "Collections": 6, "Intangible heritage": 19, "Natural heritage": 12, "Documentary Heritage": 7, "Awareness and story telling and school visits": 1, "Digital interventions and Artificial Intelligence": 1}, "funding": {"Public Sector Funding": 14, "Philanthropic & Non-Profit Funding": 11, "Private Sector & Corporate Sponsorship": 4, "All the above (incl. small private sector fun…": 1, "International expeditions, membership fees, l…": 1}, "summary": "24 organisations responded across government, NGO, private and academic sectors. Technical expertise and legal/regulatory understanding are the strongest areas, while fundraising remains the weakest. Diversifying revenue streams is the most requested form of support.", "gender_dist": {"Men": 50.2, "Women": 47.9}, "education": {"High school": 2601, "BA": 2819, "MA": 2077, "PhD": 1285}, "budget_dist": {"Less than $10,000": 2, "$1,000,000+": 4}, "capacity": {"Planning": 17, "Documentation": 20, "Conservation/restoration": 18, "Emergency response": 12, "Community engagement, advocacy, and awareness": 22, "Research/policy": 16, "Education/training": 22, "Consulting": 18}, "affiliations": {"Regional networks": {"Yes": 10, "No": 13}, "Diaspora/grassroots": {"Yes": 9, "No": 14}, "International orgs": {"Yes": 9, "No": 13}}, "timeline": {"0-5 years": 5, "6-10 years": 7, "11-15 years": 3, "16-50 years": 5, "51-100 years": 3, "Over 100 years": 1}}, "Libya": {"n_orgs": 24, "score": 55.8, "avg_years": 20.7, "ratings": {"Track record": 3.33, "Technical expertise": 3.71, "Equipment & supplies": 2.0, "Public communication": 3.25, "Digital capacity": 2.54, "Fundraising": 2.17, "Grant application": 2.25, "Legal/regulatory": 3.62, "Strategic planning": 3.17, "Professional development": 2.21, "Gender-sensitive programming": 2.42, "Institutional resilience": 2.83}, "needs": {"Training opportunities": 4.17, "Local/regional peer connection": 4.04, "International peer connection": 4.17, "Program planning assistance": 4.04, "Strategy planning assistance": 4.0, "Revenue diversification": 4.58, "Other needs": 5.0}, "trainings": {"Project planning & mgmt": 3.79, "Documentation": 3.88, "Conservation/restoration": 4.29, "Emergency response": 4.08, "Community engagement": 3.92, "Research/policy": 3.42, "Other training": 5.0}, "org_types": {"NGO": 10, "Government": 7, "Academic": 4, "Private": 3}, "registered": {"Yes": 22, "No": 2}, "scope": {"Built Environment": 24, "Natural heritage": 9, "Documentary Heritage": 12, "Collections": 11, "Intangible heritage": 17, "Focus on restoring sites and artifacts": 1}, "funding": {"Philanthropic & Non-Profit Funding": 11, "Private Sector & Corporate Sponsorship": 4, "Public Sector Funding": 12, "Indoor investment to ensure financial sustain…": 1}, "summary": "24 organisations responded, dominated by NGOs and government antiquities offices. Technical expertise and legal understanding stand out, but equipment, digital capacity and professional development are notably weak, and almost every additional-needs category is rated as high priority.", "gender_dist": {"Men": 68.0, "Women": 32.3}, "education": {"High school": 247, "BA": 318, "MA": 59, "PhD": 40}, "budget_dist": {"Less than $500": 3, "Less than $1000": 4, "Less than $10,000": 7}, "capacity": {"Planning": 20, "Documentation": 22, "Conservation/restoration": 20, "Emergency response": 11, "Community engagement, advocacy, and awareness": 22, "Research/policy": 17, "Education/training": 20, "Consulting": 22}, "affiliations": {"Regional networks": {"Yes": 2, "No": 20}, "Diaspora/grassroots": {"Yes": 5, "No": 19}, "International orgs": {"Yes": 1, "No": 23}}, "timeline": {"0-5 years": 9, "6-10 years": 7, "11-15 years": 3, "16-50 years": 1, "51-100 years": 3, "Over 100 years": 1}}, "Syria": {"n_orgs": 23, "score": 66.5, "avg_years": 6.5, "ratings": {"Track record": 3.48, "Technical expertise": 3.78, "Equipment & supplies": 2.65, "Public communication": 3.43, "Digital capacity": 3.18, "Fundraising": 2.32, "Grant application": 2.57, "Legal/regulatory": 3.14, "Strategic planning": 3.7, "Professional development": 3.5, "Gender-sensitive programming": 3.82, "Institutional resilience": 4.32}, "needs": {"Training opportunities": 3.61, "Local/regional peer connection": 3.7, "International peer connection": 3.59, "Program planning assistance": 3.43, "Strategy planning assistance": 3.52, "Revenue diversification": 3.43, "Other needs": null}, "trainings": {"Project planning & mgmt": 3.57, "Documentation": 3.09, "Conservation/restoration": 3.65, "Emergency response": 3.36, "Community engagement": 3.52, "Research/policy": 3.96, "Other training": 4.0}, "org_types": {"NGO": 17, "Private": 3, "Government": 2, "Academic": 1}, "registered": {"Yes": 20, "No": 3}, "scope": {"Built Environment": 16, "Intangible heritage": 19, "Natural heritage": 11, "Documentary Heritage": 11, "Collections": 2}, "funding": {"Philanthropic & Non-Profit Funding": 12, "Private Sector & Corporate Sponsorship": 5, "Annual subscription Fees of memebers": 1, "Self-sustained non profit": 1, "Public Sector Funding": 7, "Self funded": 1, "Self finding": 1, "International Heritage Organisations": 1}, "summary": "23 organisations responded, the large majority of them NGOs working amid ongoing instability. Institutional resilience is the highest-rated area by far, reflecting adaptability under crisis, while equipment, fundraising and grant-application capacity remain the weakest.", "gender_dist": {"Men": 38.0, "Women": 48.0}, "education": {"High school": 111, "BA": 702, "MA": 246, "PhD": 91}, "budget_dist": {"Less than $1000": 1, "Less than $10,000": 7, "$1,000,000+": 1}, "capacity": {"Planning": 15, "Documentation": 19, "Conservation/restoration": 17, "Emergency response": 12, "Community engagement, advocacy, and awareness": 20, "Research/policy": 7, "Education/training": 20, "Consulting": 12}, "affiliations": {"Regional networks": {"Yes": 6, "No": 17}, "Diaspora/grassroots": {"Yes": 11, "No": 11}, "International orgs": {"Yes": 9, "No": 14}}, "timeline": {"0-5 years": 14, "6-10 years": 4, "11-15 years": 3, "16-50 years": 1, "51-100 years": 1}}, "Turkey": {"n_orgs": 29, "score": 76.3, "avg_years": 18.5, "ratings": {"Track record": 4.45, "Technical expertise": 4.66, "Equipment & supplies": 3.56, "Public communication": 3.83, "Digital capacity": 3.66, "Fundraising": 2.5, "Grant application": 2.7, "Legal/regulatory": 4.43, "Strategic planning": 4.11, "Professional development": 3.79, "Gender-sensitive programming": 3.54, "Institutional resilience": 4.11}, "needs": {"Training opportunities": 3.82, "Local/regional peer connection": 3.43, "International peer connection": 3.82, "Program planning assistance": 2.96, "Strategy planning assistance": 3.18, "Revenue diversification": 3.5, "Other needs": 5.0}, "trainings": {"Project planning & mgmt": 3.17, "Documentation": 2.5, "Conservation/restoration": 2.89, "Emergency response": 3.34, "Community engagement": 3.57, "Research/policy": 3.21, "Other training": 3.0}, "org_types": {"Government": 9, "Academic": 8, "Private": 6, "NGO": 6}, "registered": {"Yes": 29}, "scope": {"Built Environment": 27, "Documentary Heritage": 20, "Intangible heritage": 16, "Collections": 4, "Natural heritage": 7}, "funding": {"Private Sector & Corporate Sponsorship": 6, "Annual Membership Fees and EU Project Funding": 1, "Public Sector Funding": 20, "Project-Based Funding: They rely on national …": 1, "Philanthropic & Non-Profit Funding": 7, "Competitive national and international resear…": 1, "TÜBİTAK": 1, "Erasmus+": 1, "UNESCO)": 1, "Research Grants (TÜBİTAK": 1, "EU)": 1}, "summary": "29 organisations responded, spanning government heritage directorates, universities, private restoration firms and NGOs. Technical expertise, legal/regulatory understanding and track record score highest of all five countries, while fundraising and grant-application capacity remain comparatively weak.", "gender_dist": {"Men": 47.4, "Women": 52.5}, "education": {"High school": 381, "BA": 709, "MA": 307, "PhD": 154}, "budget_dist": {"Less than $10,000": 5, "$1,000,000+": 6}, "capacity": {"Planning": 18, "Documentation": 22, "Conservation/restoration": 24, "Emergency response": 15, "Community engagement, advocacy, and awareness": 23, "Research/policy": 21, "Education/training": 23, "Consulting": 12, "Other specialised services": 6}, "affiliations": {"Regional networks": {"Yes": 11, "No": 16}, "Diaspora/grassroots": {"Yes": 11, "No": 15}, "International orgs": {"Yes": 13, "No": 16}}, "timeline": {"0-5 years": 4, "6-10 years": 9, "11-15 years": 6, "16-50 years": 7, "51-100 years": 2, "Over 100 years": 1}}, "_regional": {"ratings": {"Track record": 3.83, "Technical expertise": 4.12, "Equipment & supplies": 2.91, "Public communication": 3.6, "Digital capacity": 3.23, "Fundraising": 2.41, "Grant application": 2.57, "Legal/regulatory": 3.83, "Strategic planning": 3.72, "Professional development": 3.37, "Gender-sensitive programming": 3.31, "Institutional resilience": 3.68}, "needs": {"Training opportunities": 3.75, "Local/regional peer connection": 3.64, "International peer connection": 3.81, "Program planning assistance": 3.46, "Strategy planning assistance": 3.54, "Revenue diversification": 3.78, "Other needs": 3.17}, "trainings": {"Project planning & mgmt": 3.52, "Documentation": 3.15, "Conservation/restoration": 3.48, "Emergency response": 3.55, "Community engagement": 3.65, "Research/policy": 3.47, "Other training": 3.43}, "n_orgs": 115, "org_types": {"Government": 35, "NGO": 43, "Academic": 18, "Private": 19}, "scope": {"Built Environment": 101, "Intangible heritage": 77, "Natural heritage": 47, "Documentary Heritage": 59, "Collections": 24, "Designing and building museums and storerooms": 1, "Awareness and story telling and school visits": 1, "Digital interventions and Artificial Intelligence": 1, "Focus on restoring sites and artifacts": 1}, "capacity": {"Planning": 81, "Documentation": 96, "Conservation/restoration": 93, "Emergency response": 62, "Community engagement, advocacy, and awareness": 98, "Research/policy": 70, "Education/training": 98, "Consulting": 76, "Other specialised services": 7}, "funding": {"Public Sector Funding": 63, "Private Sector & Corporate Sponsorship": 21, "Philanthropic & Non-Profit Funding": 48, "All the above (incl. small private sector fun…": 1, "International expeditions, membership fees, l…": 1, "Indoor investment to ensure financial sustain…": 1, "Annual subscription Fees of memebers": 1, "Self-sustained non profit": 1, "Self funded": 1, "Self finding": 1, "International Heritage Organisations": 1, "Annual Membership Fees and EU Project Funding": 1, "Project-Based Funding: They rely on national …": 1, "Competitive national and international resear…": 1, "TÜBİTAK": 1, "Erasmus+": 1, "UNESCO)": 1, "Research Grants (TÜBİTAK": 1, "EU)": 1}, "budget_dist": {"Less than $10,000": 24, "$1,000,000+": 11, "Less than $500": 3, "Less than $1000": 5}, "education": {"High school": 3489, "BA": 4873, "MA": 2816, "PhD": 1733}, "affiliations": {"Regional networks": {"Yes": 35, "No": 75}, "Diaspora/grassroots": {"Yes": 46, "No": 64}, "International orgs": {"Yes": 37, "No": 76}}, "gender_dist": {"Men": 51.7, "Women": 45.3}, "avg_years": 18.8, "summary": "112 organisations across Iraq, Jordan, Libya, Syria and Turkey responded to this pilot study. The NGO (35%) and Government (31%) sectors dominate, together making up two-thirds of respondents. Region-wide, fundraising and grant-application capacity are the weakest institutional areas, while track record and technical expertise are the strongest. The highest needs are stronger international/local peer connections and revenue-diversification strategies.", "timeline": {"0-5 years": 37, "6-10 years": 27, "11-15 years": 19, "16-50 years": 18, "51-100 years": 11, "Over 100 years": 3}}};
+
+const isoNumeric = {"368":"Iraq","400":"Jordan","434":"Libya","760":"Syria","792":"Turkey"};
+
+const map = L.map('map',{zoomControl:false}).setView([33.5, 40], 4.6);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 19
+}).addTo(map);
+
+function colorFor(score, invert){
+  if(score===undefined || score===null) return "#3a3f4b";
+  // Same thresholds on the raw 1-5 score either way, but the color order is
+  // reversed for "gap/need/priority" metrics: high score -> red (bigger gap),
+  // low score -> green (smaller gap). For "strength" metrics, high -> green.
+  const colors = invert
+    ? ["#1a9850","#91cf60","#fee08b","#fc8d59","#d73027"]   // low->green ... high->red
+    : ["#d73027","#fc8d59","#fee08b","#91cf60","#1a9850"];  // low->red ... high->green
+  if(score < 2.5) return colors[0];
+  if(score < 3.0) return colors[1];
+  if(score < 3.5) return colors[2];
+  if(score < 4.0) return colors[3];
+  return colors[4];
+}
+
+// ---- Metric definitions for choropleth coloring ----
+// Each metric resolves a country's data object to a 0-100 value (for coloring)
+// plus a human-readable label of the underlying raw value.
+const metrics = [];
+Object.keys(countryData.Turkey.ratings).forEach(k=>{
+  metrics.push({ id:'rating:'+k, label:k, group:'Institutional Strength (1–5)',
+    val100:d=> d.ratings[k]!=null ? d.ratings[k] : null,
+    rawLabel:d=> d.ratings[k].toFixed(2)+' / 5' });
+});
+Object.keys(countryData.Turkey.needs).forEach(k=>{
+  metrics.push({ id:'need:'+k, label:k, group:'Additional Needs (1–5)',
+    val100:d=> d.needs[k]!=null ? d.needs[k] : null,
+    rawLabel:d=> (d.needs[k]!=null ? d.needs[k].toFixed(2) : '—')+' / 5' });
+});
+Object.keys(countryData.Turkey.trainings).forEach(k=>{
+  metrics.push({ id:'train:'+k, label:k, group:'Training Priority (1–5)',
+    val100:d=> d.trainings[k]!=null ? d.trainings[k] : null,
+    rawLabel:d=> (d.trainings[k]!=null ? d.trainings[k].toFixed(2) : '—')+' / 5' });
+});
+
+let currentMetric = metrics[0];
+
+// ---- Report-derived context notes for specific metrics ----
+// Drawn from "Survey on Organizational Capacity in Heritage Preservation in the MENA Region" (Alkhalaf, 2026)
+// ---- What a HIGH vs LOW score actually means for each metric ----
+const metricMeaning = {
+  'rating:Track record': "A high score means the organisation has a consistent history of delivering heritage projects, which builds donor trust; a low score signals limited delivery history, making it harder to win grants or contracts.",
+  'rating:Technical expertise': "A high score means strong in-house conservation/archaeology know-how; a low score means projects depend heavily on outside consultants.",
+  'rating:Equipment & supplies': "A high score means the organisation has the tools and materials needed for fieldwork; a low score means even trained staff may be unable to properly execute conservation work.",
+  'rating:Public communication': "A high score means the organisation is effective at reaching the public, media and stakeholders; a low score means limited visibility and difficulty building public support.",
+  'rating:Digital capacity': "A high score means the organisation actively uses digital tools such as GIS, databases or 3D documentation; a low score means heritage records and processes remain largely undigitised.",
+  'rating:Fundraising': "A high score means the organisation can raise money independently beyond its core funding; a low score means it is financially dependent on a narrow set of donors or state budgets and vulnerable to funding gaps.",
+  'rating:Grant application': "A high score means the organisation is effective at writing and winning competitive grants; a low score means it likely misses out on available international funding opportunities.",
+  'rating:Legal/regulatory': "A high score means the organisation has a clear understanding of heritage laws and permitting processes; a low score means legal complexity is likely to slow down or block its projects.",
+  'rating:Strategic planning': "A high score means the organisation works toward a long-term vision and plan; a low score means it tends to operate reactively, project-to-project.",
+  'rating:Professional development': "A high score means staff are regularly trained and upskilled; a low score means skills are more likely to stagnate, making it harder to adopt new methods.",
+  'rating:Gender-sensitive programming': "A high score means gender considerations are actively integrated into programmes and staffing; a low score means the gender dimension is largely absent from planning.",
+  'rating:Institutional resilience': "A high score means the organisation can keep functioning through crises or disruption; a low score means its operations are vulnerable to shocks such as conflict, funding cuts or political change.",
+  'need:Training opportunities': "A high score means staff feel under-trained and want more capacity-building support; a low score means staff already feel adequately trained.",
+  'need:Local/regional peer connection': "A high score means the organisation feels isolated from other regional actors and wants more networking; a low score means it is already well-connected locally and regionally.",
+  'need:International peer connection': "A high score means the organisation lacks links to international heritage networks and donors and wants stronger ties; a low score means it is already well-connected internationally.",
+  'need:Program planning assistance': "A high score means the organisation wants outside help designing or improving its programmes; a low score means it feels confident in its own programme design.",
+  'need:Strategy planning assistance': "A high score means the organisation wants help building an organisational strategy or long-term vision; a low score means it already has a clear strategy.",
+  'need:Revenue diversification': "A high score means the organisation is too dependent on one or two funding sources and urgently wants new revenue models; a low score means its funding base is already relatively diverse.",
+  'train:Project planning & mgmt': "A high score means staff would benefit most from training in project planning and management; a low score means this is a relatively lower priority compared with other training areas.",
+  'train:Documentation': "A high score means documentation skills are seen as a priority training gap; a low score means documentation is already considered adequately covered.",
+  'train:Conservation/restoration': "A high score means hands-on conservation/restoration training is a priority for staff; a low score means it is a comparatively lower priority.",
+  'train:Emergency response': "A high score means staff want training in disaster and crisis response for heritage; a low score means this is a comparatively lower priority.",
+  'train:Community engagement': "A high score means staff want training in public engagement, advocacy and outreach; a low score means this is a comparatively lower priority.",
+  'train:Research/policy': "A high score means staff want training in research methods and heritage policy work; a low score means this is a comparatively lower priority.",
+};
+
+const metricNotes = {
+  'rating:Technical expertise': "The single highest-rated institutional strength region-wide (avg 4.12/5) &mdash; every country scores above 3.7, from Turkey (4.66) down to Libya (3.71).",
+  'rating:Fundraising': "The single lowest-rated institutional strength in every country surveyed (avg 2.41/5) &mdash; a shared weak point regardless of context, from Libya (2.17) to Jordan (2.54).",
+  'rating:Grant application': "The second-lowest-rated institutional strength region-wide (avg 2.57/5), closely tied to fundraising capacity.",
+  'rating:Track record': "Tied with legal/regulatory understanding as the second-strongest area region-wide; Jordan, Iraq and Turkey all score above 3.5.",
+  'rating:Institutional resilience': "Syria rates this highest (4.32/5) despite over a decade of conflict, while Libya rates it lowest (2.83) &mdash; resilience does not track simply with political stability.",
+  'rating:Equipment & supplies': "The second-lowest-rated area region-wide (avg 2.91/5); Libya (2.0) and Syria (2.65) report the weakest access to tools and materials.",
+  'rating:Legal/regulatory': "Rated relatively highly everywhere (avg 3.83/5); Turkey and Jordan score above 4, suggesting the issue is less about knowing the rules than applying them consistently across institutions.",
+  'need:Revenue diversification': "One of the two highest-rated needs region-wide; Libya rates it highest (4.58/5), reflecting heavy reliance on a narrow set of funding sources.",
+  'need:International peer connection': "The single highest-rated additional need region-wide (avg 3.81/5) &mdash; every country wants stronger cross-border links.",
+  'need:Local/regional peer connection': "Consistently rated as a high need across all five countries, pointing to demand for regional coordination platforms.",
+  'need:Training opportunities': "Libya rates this need highest (4.17/5); Iraq rates it comparatively lowest (3.47), though still a moderate-to-high need.",
+  'train:Community engagement': "The single highest-rated training priority region-wide (avg 3.65/5); Iraq rates it highest of all (3.93).",
+  'train:Emergency response': "The second-highest training priority region-wide; Libya rates it highest (4.08), reflecting post-conflict reconstruction needs.",
+  'train:Documentation': "Consistently the lowest training priority across all five countries (avg 3.15/5), lowest of all in Turkey (2.50).",
+  'train:Conservation/restoration': "Libya rates this training need highest (4.29/5) &mdash; the single highest score recorded for any country in any training category.",
+
+  'rating:Public communication': "Jordan and Turkey rate this highest (3.83/5); Libya rates it lowest (3.25) &mdash; a mid-strength area region-wide (avg 3.6/5).",
+  'rating:Digital capacity': "Turkey rates this highest (3.66/5) and Libya lowest (2.54/5); regionally it sits in the lower-middle range (avg 3.23/5), well below technical expertise.",
+  'rating:Strategic planning': "Turkey (4.11) and Jordan (3.96) rate this highest, Libya lowest (3.17) &mdash; one of the stronger areas region-wide (avg 3.72/5).",
+  'rating:Professional development': "Libya rates this far below the rest (2.21/5) while Turkey, Jordan and Iraq all score above 3.6 &mdash; the widest country spread of any institutional strength area.",
+  'rating:Gender-sensitive programming': "Syria rates this highest (3.82/5) despite its difficult operating context, while Libya rates it lowest (2.42/5).",
+  'need:Program planning assistance': "Libya rates this need highest (4.04/5); Turkey rates it lowest (2.96/5), the only country below 3.",
+  'need:Strategy planning assistance': "Libya again rates this highest (4.0/5); Turkey lowest (3.18/5) &mdash; a similar pattern to program-planning assistance.",
+  'train:Project planning & mgmt': "Libya rates this training need highest (3.79/5); Turkey lowest (3.17/5), a mid-ranking priority region-wide (avg 3.52/5).",
+  'train:Research/policy': "Syria (3.96) and Iraq (3.87) rate this highest; Jordan rates it lowest (3.12/5) &mdash; the country rankings here are nearly the reverse of community-engagement training.",
+};
+
+function metricValue(d, m){
+  if(!d) return null;
+  const v = m.val100(d);
+  return (v===null || v===undefined || isNaN(v)) ? null : v;
+}
+
+function metricDescription(m){
+  const regional = countryData._regional;
+  const group = m.id.startsWith('rating:') ? regional.ratings :
+                m.id.startsWith('need:') ? regional.needs : regional.trainings;
+  const key = m.id.split(':')[1];
+  const avg = group[key];
+
+  const kind = m.id.split(':')[0];
+  const whatIsThis = kind === 'rating'
+    ? `Each organisation rated its own <i>${m.label}</i> on a scale of 1 (weakest) to 5 (strongest). The map shows each country's <b>average self-rated score</b> &mdash; green = stronger, red = weaker.`
+    : kind === 'need'
+    ? `Each organisation rated how much it needs <i>${m.label}</i>, beyond additional funding, on a scale of 1 (lowest need) to 5 (highest need). The map shows each country's <b>average score</b> &mdash; red = bigger gap/higher need, green = less of a concern.`
+    : `Each organisation ranked how useful training in <i>${m.label}</i> would be, on a scale of 1 (least useful) to 5 (most useful). The map shows each country's <b>average ranking</b> &mdash; red = higher training priority, green = lower priority.`;
+
+  // per-country breakdown, sorted high to low
+  const plural = kind === 'rating' ? 'ratings' : kind === 'need' ? 'needs' : 'trainings';
+  const countries = ['Iraq','Jordan','Libya','Syria','Turkey'];
+  const rows = countries.map(c=>{
+    const v = countryData[c][plural][key];
+    return [c, v];
+  }).filter(([c,v])=>v!=null).sort((a,b)=>b[1]-a[1]);
+  const rowsHtml = rows.map(([c,v])=>`<span style="display:inline-block;min-width:64px;">${c}: <b>${v.toFixed(2)}</b></span>`).join(' &nbsp; ');
+
+  const meaning = metricMeaning[m.id] || '';
+
+  const note = metricNotes[m.id] || '';
+
+  return `<div class="descBlock b1">${whatIsThis}</div>` +
+         `<div class="descBlock b2">${meaning}</div>` +
+         `<div class="descBlock b3">Regional average (115 orgs): <b>${avg}/5</b> &mdash; by country (highest to lowest): ${rowsHtml}${note ? '<br>'+note : ''}</div>`;
+}
+
+function styleFor(name){
+  const d = countryData[name];
+  const v = metricValue(d, currentMetric);
+  const invert = !currentMetric.id.startsWith('rating:');
+  return { fillColor: colorFor(v, invert), weight: 1.5, color:"#1a1f29", fillOpacity: v===null ? 0.25 : 0.78 };
+}
+
+const targetCountries = ["Turkey", "Iraq", "Syria", "Jordan", "Libya"];
+let geoLayer;
+
+fetch('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json')
+  .then(res => res.json())
+  .then(data => {
+    geoLayer = L.geoJSON(data, {
+      filter: f => targetCountries.includes(f.properties.name),
+      style: f => styleFor(f.properties.name),
+      onEachFeature: (f, layer) => {
+        layer.on('click', (e)=> { L.DomEvent.stopPropagation(e); showCountry(f.properties.name); });
+        layer.on('mouseover', ()=> layer.setStyle({fillOpacity:0.97, weight:2.2}));
+        layer.on('mouseout', ()=> layer.setStyle(styleFor(f.properties.name)));
+        // Ülke ismini merkez noktasına marker olarak ekler
+    const center = layer.getBounds().getCenter();
+    L.marker(center, {
+      interactive: false,
+      icon: L.divIcon({
+        className: 'country-label',
+        html: f.properties.name, // Ülke adını buraya yazar
+        iconSize: [120, 20]
+      })
+    }).addTo(map);
+      }
+    }).addTo(map);
+    map.fitBounds(geoLayer.getBounds(), {paddingTopLeft:[20,140], paddingBottomRight:[20,20]});
+    refreshMapColors();
+  });
+
+// Clicking empty map area (outside any country polygon) shows the regional overview
+map.on('click', ()=> showCountry('_regional'));
+
+function refreshMapColors(){
+  if(!geoLayer) return;
+  geoLayer.eachLayer(layer=>{
+    const name = layer.feature.properties.name;
+    layer.setStyle(styleFor(name));
+    const d = countryData[name];
+    const v = metricValue(d, currentMetric);
+    const valTxt = (d && v!==null) ? currentMetric.rawLabel(d) : 'No data';
+    layer.unbindTooltip();
+    layer.bindTooltip(name + " — " + currentMetric.label + ": " + valTxt);
+  });
+  legendTitleEl.textContent = currentMetric.label;
+  updateLegendBands();
+  document.getElementById('metricDesc').innerHTML = metricDescription(currentMetric);
+}
+
+// ---- Custom dropdown for metric selector (fixed position, avoids native <select> popup quirks) ----
+const metricBtn = document.getElementById('metricSelectBtn');
+const metricDropdown = document.getElementById('metricDropdown');
+
+let lastGroup = null;
+metrics.forEach(m=>{
+  if(m.group !== lastGroup){
+    const g = document.createElement('div');
+    g.className = 'grp';
+    g.textContent = m.group;
+    metricDropdown.appendChild(g);
+    lastGroup = m.group;
+  }
+  const opt = document.createElement('div');
+  opt.className = 'opt';
+  opt.textContent = m.label;
+  opt.dataset.id = m.id;
+  opt.addEventListener('click', ()=>{
+    currentMetric = m;
+    metricBtn.textContent = m.label;
+    metricDropdown.classList.remove('open');
+    metricDropdown.querySelectorAll('.opt').forEach(o=>o.classList.toggle('selected', o.dataset.id===m.id));
+    refreshMapColors();
+  });
+  metricDropdown.appendChild(opt);
+});
+
+metricBtn.addEventListener('click', (e)=>{
+  e.stopPropagation();
+  metricDropdown.classList.toggle('open');
+});
+document.addEventListener('click', (e)=>{
+  if(!metricDropdown.contains(e.target) && e.target !== metricBtn){
+    metricDropdown.classList.remove('open');
+  }
+});
+
+const charts = [];
+function destroyCharts(){ charts.forEach(c=>c.destroy()); charts.length = 0; }
+
+const palette = ['#63b3ed','#f6ad55','#68d391','#f687b3','#b794f4','#fc8181','#4fd1c5','#f6e05e','#a0aec0','#ed8936','#9f7aea'];
+
+function makeRadar(canvasId, labels, values, label){
+  const c = new Chart(document.getElementById(canvasId), {
+    type:'radar',
+    data:{ labels, datasets:[{ label, data: values,
+      backgroundColor:'rgba(99,179,237,0.25)', borderColor:'#63b3ed', pointBackgroundColor:'#63b3ed', pointRadius:2}]},
+    options:{ scales:{ r:{ min:0,max:5, ticks:{color:'#888',backdropColor:'transparent', stepSize:1}, grid:{color:'#333'}, angleLines:{color:'#333'}, pointLabels:{color:'#ccc', font:{size:8.5}}}},
+      plugins:{ legend:{display:false},
+        tooltip:{callbacks:{label:(ctx)=> ctx.label+': '+ctx.formattedValue+' / 5'}}},
+      maintainAspectRatio:false, responsive:false }
+  });
+  charts.push(c);
+}
+
+function makeHBar(canvasId, labels, values, color, max, isCount){
+  const c = new Chart(document.getElementById(canvasId), {
+    type:'bar',
+    data:{ labels, datasets:[{ data: values, backgroundColor: color, borderRadius:3}]},
+    options:{ indexAxis:'y',
+      scales:{ x:{min:0,max:max||5, ticks:{color:'#888', precision: isCount?0:1}, grid:{color:'#222'}},
+               y:{ticks:{color:'#ccc', font:{size:9}}, grid:{display:false}}},
+      plugins:{ legend:{display:false},
+        tooltip:{callbacks:{label:(ctx)=> isCount ? ctx.parsed.x+' org(s)' : ctx.parsed.x+' / 5'}}},
+      maintainAspectRatio:false, responsive:false }
+  });
+  charts.push(c);
+}
+
+function makeVBar(canvasId, labels, values, color){
+  const c = new Chart(document.getElementById(canvasId), {
+    type:'bar',
+    data:{ labels, datasets:[{ data: values, backgroundColor: color}]},
+    options:{
+      scales:{ y:{beginAtZero:true, ticks:{color:'#888'}, grid:{color:'#222'}},
+               x:{ticks:{color:'#ccc', font:{size:9}}, grid:{display:false}}},
+      plugins:{ legend:{display:false}}, maintainAspectRatio:false, responsive:false }
+  });
+  charts.push(c);
+}
+
+function makeDonut(canvasId, labels, values){
+  const total = values.reduce((a,b)=>a+b,0);
+  const c = new Chart(document.getElementById(canvasId), {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data: values, backgroundColor: palette, borderColor:'#1b212c', borderWidth:2 }]},
+    options:{
+      cutout:'62%',
+      plugins:{ legend:{position:'right', labels:{color:'#ccc', font:{size:9}, boxWidth:12}},
+        tooltip:{callbacks:{label:(ctx)=>{
+          const pct = total ? Math.round(ctx.parsed/total*100) : 0;
+          return ctx.label+': '+ctx.parsed+' ('+pct+'%)';
+        }}}},
+      maintainAspectRatio:false, responsive:false }
+  });
+  charts.push(c);
+}
+
+function showCountry(name){
+  const d = countryData[name];
+  const panel = document.getElementById('panel');
+  if(!d){ panel.innerHTML = `<h2>${name}</h2><div class="placeholder">No data for this country.</div>`; return; }
+
+  destroyCharts();
+
+  const isRegional = (name === '_regional');
+  const title = isRegional ? 'Regional Overview &mdash; All 5 Countries' : name;
+
+  panel.innerHTML = `
+    <h2>${title}</h2>
+    <div class="topstats">
+      <div class="stat"><span>Responding Organisations</span><b>${d.n_orgs}</b></div>
+      <div class="stat"><span>Avg. Years of Operation</span><b>${d.avg_years ?? '—'}</b></div>
+    </div>
+    <p class="summary">${d.summary}</p>
+
+    <div class="grid">
+      <div class="card full">
+        <h3>Institutional Strength Areas (1&ndash;5 avg.)</h3>
+        <p class="cardCaption" id="cap-radar"></p>
+        <div class="chartwrap"><canvas id="radar" width="360" height="300"></canvas></div>
+      </div>
+
+      <div class="card full">
+        <h3>Additional Institutional Needs (1&ndash;5 avg.)</h3>
+        <p class="cardCaption" id="cap-needs"></p>
+        <div class="chartwrap"><canvas id="needs" width="360" height="190"></canvas></div>
+      </div>
+
+      <div class="card full">
+        <h3>Training Priorities (1&ndash;5 avg.)</h3>
+        <p class="cardCaption" id="cap-training"></p>
+        <div class="chartwrap"><canvas id="training" width="360" height="190"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h3>Organisation Types</h3>
+        <p class="cardCaption" id="cap-orgtypes"></p>
+        <div class="chartwrap"><canvas id="orgtypes" width="170" height="170"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Avg. Gender Distribution</h3>
+        <p class="cardCaption" id="cap-gender"></p>
+        <div class="chartwrap"><canvas id="gender" width="170" height="170"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h3>Registration Status</h3>
+        <p class="cardCaption" id="cap-registered"></p>
+        <div class="chartwrap"><canvas id="registered" width="170" height="150"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Operational Timeline</h3>
+        <p class="cardCaption" id="cap-timeline"></p>
+        <div class="chartwrap"><canvas id="timeline" width="170" height="150"></canvas></div>
+      </div>
+
+      <div class="card full">
+        <h3>Scope of Heritage Work (mentions)</h3>
+        <p class="cardCaption" id="cap-scope"></p>
+        <div class="chartwrap"><canvas id="scope" width="360" height="160"></canvas></div>
+      </div>
+
+      <div class="card full">
+        <h3>Capacity for Intervention (mentions)</h3>
+        <p class="cardCaption" id="cap-capacity"></p>
+        <div class="chartwrap"><canvas id="capacity" width="360" height="190"></canvas></div>
+      </div>
+
+      <div class="card full">
+        <h3>Sources of Funding (mentions)</h3>
+        <p class="cardCaption" id="cap-funding"></p>
+        <div class="chartwrap"><canvas id="funding" width="360" height="170"></canvas></div>
+      </div>
+
+      <div class="card full">
+        <h3>Annual Operating Budget (organisation count)</h3>
+        <p class="cardCaption" id="cap-budget"></p>
+        <div class="chartwrap"><canvas id="budget" width="360" height="150"></canvas></div>
+      </div>
+
+      <div class="card full">
+        <h3>Education Level (total staff across responding orgs)</h3>
+        <p class="cardCaption" id="cap-education"></p>
+        <div class="chartwrap"><canvas id="education" width="360" height="130"></canvas></div>
+      </div>
+
+      <div class="card full">
+        <h3>Network &amp; Membership Affiliations</h3>
+        <p class="cardCaption" id="cap-affiliations"></p>
+        <div class="chartwrap"><canvas id="affiliations" width="360" height="150"></canvas></div>
+      </div>
+    </div>
+  `;
+
+  makeRadar('radar', Object.keys(d.ratings), Object.values(d.ratings).map(v=>v??0), name);
+
+  const needsEntries = Object.entries(d.needs).filter(([k,v])=>v!==null);
+  makeHBar('needs', needsEntries.map(e=>e[0]), needsEntries.map(e=>e[1]), '#f6ad55');
+
+  const trainEntries = Object.entries(d.trainings).filter(([k,v])=>v!==null);
+  makeHBar('training', trainEntries.map(e=>e[0]), trainEntries.map(e=>e[1]), '#68d391');
+
+  const orgEntries = Object.entries(d.org_types);
+  makeDonut('orgtypes', orgEntries.map(e=>e[0]), orgEntries.map(e=>e[1]));
+
+  const scopeEntries = Object.entries(d.scope).sort((a,b)=>b[1]-a[1]);
+  const maxScope = Math.max(...scopeEntries.map(e=>e[1]));
+  makeHBar('scope', scopeEntries.map(e=>e[0]), scopeEntries.map(e=>e[1]), '#b794f4', maxScope);
+
+  const capEntries = Object.entries(d.capacity).sort((a,b)=>b[1]-a[1]);
+  const maxCap = Math.max(...capEntries.map(e=>e[1]));
+  makeHBar('capacity', capEntries.map(e=>e[0]), capEntries.map(e=>e[1]), '#4fd1c5', maxCap);
+
+  const fundEntries = Object.entries(d.funding).sort((a,b)=>b[1]-a[1]).slice(0,7);
+  const maxFund = Math.max(...fundEntries.map(e=>e[1]));
+  makeHBar('funding', fundEntries.map(e=>e[0]), fundEntries.map(e=>e[1]), '#fc8181', maxFund);
+
+  const budgetEntries = Object.entries(d.budget_dist);
+  const maxBudget = Math.max(...budgetEntries.map(e=>e[1]), 1);
+  makeHBar('budget', budgetEntries.map(e=>e[0]), budgetEntries.map(e=>e[1]), '#f6e05e', maxBudget, true);
+
+  const genderEntries = Object.entries(d.gender_dist).filter(([k,v])=>v!==null);
+  makeDonut('gender', genderEntries.map(e=>e[0]), genderEntries.map(e=>e[1]));
+
+  const eduEntries = Object.entries(d.education);
+  const maxEdu = Math.max(...eduEntries.map(e=>e[1]), 1);
+  makeHBar('education', eduEntries.map(e=>e[0]), eduEntries.map(e=>e[1]), '#9f7aea', maxEdu, true);
+
+  // Registration status
+  const regEntries = Object.entries(d.registered || {});
+  makeDonut('registered', regEntries.map(e=>e[0]), regEntries.map(e=>e[1]));
+
+  // Operational timeline
+  const tlOrder = ['0-5 years','6-10 years','11-15 years','16-50 years','51-100 years','Over 100 years'];
+  const tlEntries = tlOrder.filter(k=>d.timeline && d.timeline[k]).map(k=>[k, d.timeline[k]]);
+  const maxTl = Math.max(...tlEntries.map(e=>e[1]), 1);
+  makeHBar('timeline', tlEntries.map(e=>e[0]), tlEntries.map(e=>e[1]), '#63b3ed', maxTl, true);
+
+  const affLabels = Object.keys(d.affiliations);
+  const affYes = affLabels.map(k=>d.affiliations[k].Yes);
+  const affNo = affLabels.map(k=>d.affiliations[k].No);
+  const c = new Chart(document.getElementById('affiliations'), {
+    type:'bar',
+    data:{ labels: affLabels, datasets:[
+      {label:'Yes', data: affYes, backgroundColor:'#68d391', borderRadius:3},
+      {label:'No', data: affNo, backgroundColor:'#4a5568', borderRadius:3}
+    ]},
+    options:{ indexAxis:'y',
+      scales:{ x:{stacked:true, beginAtZero:true, ticks:{color:'#888', precision:0}, grid:{color:'#222'}},
+               y:{stacked:true, ticks:{color:'#ccc', font:{size:9}}, grid:{display:false}}},
+      plugins:{ legend:{position:'bottom', labels:{color:'#ccc', boxWidth:14}},
+        tooltip:{callbacks:{label:(ctx)=> ctx.dataset.label+': '+ctx.parsed.x+' org(s)'}}},
+      maintainAspectRatio:false, responsive:false }
+  });
+  charts.push(c);
+
+  setCaptions(d, name, isRegional);
+}
+
+// ---- Dynamic, data-driven captions for each chart ----
+function pct(part, total){ return total ? Math.round(part/total*100) : 0; }
+function topEntries(obj, n){ return Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,n); }
+function fmtList(arr){ return arr.map(e=>e[0]).join(', '); }
+
+function setCaptions(d, name, isRegional){
+  const scope = isRegional ? 'Across the region' : `In ${name}`;
+  const totalOrgs = d.n_orgs;
+
+  // Ratings: highest / lowest
+  const ratingEntries = Object.entries(d.ratings).filter(([k,v])=>v!=null);
+  const ratingSorted = [...ratingEntries].sort((a,b)=>b[1]-a[1]);
+  const rTop = ratingSorted[0], rBot = ratingSorted[ratingSorted.length-1];
+  document.getElementById('cap-radar').innerHTML =
+    `Self-rated 1&ndash;5 across 12 areas. ${scope}, <b>${rTop[0]}</b> (${rTop[1]}/5) is strongest and <b>${rBot[0]}</b> (${rBot[1]}/5) weakest.`;
+
+  // Needs: highest
+  const needEntries = Object.entries(d.needs).filter(([k,v])=>v!=null);
+  const needSorted = [...needEntries].sort((a,b)=>b[1]-a[1]);
+  const nTop = needSorted[0];
+  document.getElementById('cap-needs').innerHTML =
+    `Beyond funding, ${scope.toLowerCase()} the highest-rated need is <b>${nTop[0]}</b> (${nTop[1]}/5).`;
+
+  // Trainings: highest / lowest
+  const trainEntries = Object.entries(d.trainings).filter(([k,v])=>v!=null);
+  const trainSorted = [...trainEntries].sort((a,b)=>b[1]-a[1]);
+  const tTop = trainSorted[0], tBot = trainSorted[trainSorted.length-1];
+  document.getElementById('cap-training').innerHTML =
+    `${scope}, <b>${tTop[0]}</b> (${tTop[1]}/5) ranks as the top training priority and <b>${tBot[0]}</b> (${tBot[1]}/5) the lowest.`;
+
+  // Org types
+  const otTop = topEntries(d.org_types, 2);
+  const otSum = Object.values(d.org_types).reduce((a,b)=>a+b,0);
+  document.getElementById('cap-orgtypes').innerHTML =
+    `${scope}, <b>${fmtList(otTop)}</b> make up ${pct(otTop[0][1]+otTop[1][1], otSum)}% of the ${totalOrgs} responding organisations.`;
+
+  // Gender
+  document.getElementById('cap-gender').innerHTML =
+    `Average overall staff split: <b>${d.gender_dist.Men}% men / ${d.gender_dist.Women}% women</b>${isRegional ? ' &mdash; leadership roles skew further toward men (avg. ~59%).' : '.'}`;
+
+  // Registration
+  const regYes = (d.registered && d.registered.Yes) || 0;
+  const regSum = Object.values(d.registered||{}).reduce((a,b)=>a+b,0);
+  document.getElementById('cap-registered').innerHTML =
+    `${pct(regYes, regSum)}% of responding organisations are officially registered.`;
+
+  // Timeline
+  const tlTop = topEntries(d.timeline||{}, 1);
+  document.getElementById('cap-timeline').innerHTML = tlTop.length
+    ? `Most organisations have been active for <b>${tlTop[0][0]}</b> (${tlTop[0][1]} of ${totalOrgs}).`
+    : '';
+
+  // Scope
+  const scopeTop = topEntries(d.scope, 3);
+  document.getElementById('cap-scope').innerHTML =
+    `${scope}, the most common focus areas are <b>${fmtList(scopeTop)}</b> (by number of mentions).`;
+
+  // Capacity
+  const capTop = topEntries(d.capacity, 2);
+  document.getElementById('cap-capacity').innerHTML =
+    `${scope}, <b>${fmtList(capTop)}</b> are the most widely reported intervention capacities.`;
+
+  // Funding
+  const fundTop = topEntries(d.funding, 2);
+  const fundSum = totalOrgs; // mentions can exceed orgs, use orgs as denom for rough %
+  document.getElementById('cap-funding').innerHTML =
+    `${scope}, the leading funding sources are <b>${fmtList(fundTop)}</b>.`;
+
+  // Budget
+  const budgetTop = topEntries(d.budget_dist, 1);
+  document.getElementById('cap-budget').innerHTML = budgetTop.length
+    ? `The most common annual operating budget band is <b>${budgetTop[0][0]}</b> (${budgetTop[0][1]} organisations).`
+    : 'No budget data reported.';
+
+  // Education
+  const eduTotal = Object.values(d.education).reduce((a,b)=>a+b,0);
+  const eduAdv = (d.education['MA']||0) + (d.education['PhD']||0);
+  document.getElementById('cap-education').innerHTML =
+    `${eduTotal.toLocaleString()} staff in total; <b>${pct(eduAdv, eduTotal)}%</b> hold a master's or PhD.`;
+
+  // Affiliations
+  const affParts = Object.entries(d.affiliations).map(([k,v])=>{
+    const tot = v.Yes+v.No;
+    return `${k.toLowerCase()}: ${pct(v.Yes,tot)}%`;
+  });
+  document.getElementById('cap-affiliations').innerHTML =
+    `Share of organisations answering "Yes" &mdash; ${affParts.join('; ')}.`;
+}
+
+const legend = L.control({position:'bottomleft'});
+let legendTitleEl;
+legend.onAdd = function(){
+  const div = L.DomUtil.create('div','legend');
+  div.innerHTML = '<b id="legendTitle">Track record</b>' +
+    '<div id="legendSubtitle" style="color:#9aa;font-size:0.85em;margin-bottom:4px;"></div>' +
+    '<div class="row"><i style="background:#1a9850"></i><span id="legendBand1">4.0&ndash;5.0</span></div>' +
+    '<div class="row"><i style="background:#91cf60"></i><span>3.5&ndash;3.9</span></div>' +
+    '<div class="row"><i style="background:#fee08b"></i><span>3.0&ndash;3.4</span></div>' +
+    '<div class="row"><i style="background:#fc8d59"></i><span>2.5&ndash;2.9</span></div>' +
+    '<div class="row"><i style="background:#d73027"></i><span id="legendBand5">0&ndash;2.4</span></div>' +
+    '<div class="row"><i style="background:#3a3f4b"></i><span>No data</span></div>';
+  return div;
+};
+legend.addTo(map);
+legendTitleEl = document.getElementById('legendTitle');
+const legendSubtitleEl = document.getElementById('legendSubtitle');
+const legendBand1El = document.getElementById('legendBand1');
+const legendBand5El = document.getElementById('legendBand5');
+
+function updateLegendBands(){
+  const isRating = currentMetric.id.startsWith('rating:');
+  if(isRating){
+    legendSubtitleEl.textContent = 'Green = stronger, red = weaker';
+    legendBand1El.innerHTML = '4.0&ndash;5.0 (strong)';
+    legendBand5El.innerHTML = '0&ndash;2.4 (weak)';
+  } else {
+    legendSubtitleEl.textContent = 'Red = bigger gap, green = smaller gap';
+    legendBand1El.innerHTML = '0&ndash;2.4 (small gap)';
+    legendBand5El.innerHTML = '4.0&ndash;5.0 (large gap)';
+  }
+}
+
+// Initial color/tooltip pass + dropdown default
+metricBtn.textContent = currentMetric.label;
+metricDropdown.querySelector(`.opt[data-id="${currentMetric.id}"]`).classList.add('selected');
+refreshMapColors();
+
+// HARİTA YÜKLENDİĞİNDE REGIONAL OVERVIEW'I OTOMATİK AÇ
+window.addEventListener('load', () => {
+    showCountry('_regional');
+});
+</script>
+</body>
+</html>
